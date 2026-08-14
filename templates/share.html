@@ -35,12 +35,16 @@
         <span class="share-by">由 ClipNest 分享 · <a href="/">去首页</a></span>
       </header>
 
-      <main class="share-main" id="share-main">
-        <div class="state-page">
-          <span class="spinner" aria-hidden="true"></span>
-          <p class="state-text">正在加载分享内容…</p>
-        </div>
-      </main>
+      <!-- 目录侧栏只在「分享了带子文件夹的目录」时才由 JS 填充并显示 -->
+      <div class="share-body" id="share-body">
+        <aside class="share-side" id="share-side" hidden></aside>
+        <main class="share-main" id="share-main">
+          <div class="state-page">
+            <span class="spinner" aria-hidden="true"></span>
+            <p class="state-text">正在加载分享内容…</p>
+          </div>
+        </main>
+      </div>
     </div>
 
     <div class="toast-root" id="toast-root" role="status" aria-live="polite"></div>

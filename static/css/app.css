@@ -1869,6 +1869,36 @@ button.crumb:hover {
   margin-left: auto;
 }
 
+.share-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* 带子文件夹的分享才有侧栏。此时整页锁在视口内、两栏各自滚动，
+   目录不会跟着内容滚走 —— 和登录后看自己的库是同一个操作方式。 */
+.share-page.has-side {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.share-side {
+  flex: none;
+  width: var(--sidebar-w);
+  min-height: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+
+.share-side[hidden] {
+  display: none;
+}
+
+.has-side .share-main {
+  overflow-y: auto;
+  padding-top: var(--s-6);
+}
+
 .share-main {
   flex: 1;
   width: 100%;
@@ -1881,6 +1911,29 @@ button.crumb:hover {
 
 .share-main.is-solo {
   max-width: 840px;
+}
+
+/* 窄屏放不下并排两栏：目录改成顶部一块，自己滚，页面恢复整页滚动 */
+@media (max-width: 860px) {
+  .share-page.has-side {
+    height: auto;
+    overflow: visible;
+  }
+
+  .share-body {
+    display: block;
+  }
+
+  .share-side {
+    width: auto;
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .has-side .share-main {
+    overflow: visible;
+  }
 }
 
 .share-head {

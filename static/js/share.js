@@ -21,6 +21,8 @@ const ICONS = {
   alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5M12 16h.01"/>',
   folder:
     '<path d="M3 8a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.4.6L11.5 8H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  chevronRight: '<path d="m9 5 7 7-7 7"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M2.5 12h2M19.5 12h2M5.4 18.6l1.4-1.4M17.2 6.8l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/>',
   monitor: '<rect x="2.5" y="4" width="19" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
@@ -230,69 +232,229 @@ function renderItemPayload(payload, meta) {
   main.appendChild(row);
 }
 
+/* 分享的目录快照。渲染成「左树右卡片」，和登录后看自己的库是同一套操作方式：
+   点左边切换文件夹，右边只换内容，树本身不跟着滚走。 */
+const snap = {
+  name: "",
+  items: [],
+  byParent: new Map(),
+  byId: new Map(),
+  expanded: new Set(),
+  current: null, // 当前选中的文件夹 id，null = 分享根
+};
+
+const childFolders = (id) => snap.byParent.get(id ?? null) || [];
+
+/** 含自身的子树 id 集合。 */
+function subtreeIds(id) {
+  const out = new Set([id ?? null]);
+  const stack = [id ?? null];
+  while (stack.length) {
+    for (const child of childFolders(stack.pop())) {
+      if (out.has(child.id)) continue; // 快照理论上无环，真坏了也不能死循环
+      out.add(child.id);
+      stack.push(child.id);
+    }
+  }
+  return out;
+}
+
+const itemsOf = (id) => snap.items.filter((it) => (it.folder_id ?? null) === (id ?? null));
+
+function itemsInSubtree(id) {
+  const ids = subtreeIds(id);
+  return snap.items.filter((it) => ids.has(it.folder_id ?? null));
+}
+
+/** 从分享根算起的完整路径，用作标题。 */
+function folderLabel(id) {
+  const parts = [];
+  let node = id == null ? null : snap.byId.get(id);
+  while (node) {
+    parts.unshift(node.name ?? "");
+    node = node.parent_id == null ? null : snap.byId.get(node.parent_id);
+  }
+  return [snap.name, ...parts].join(" / ");
+}
+
 function renderFolderPayload(payload, meta) {
   const name = payload.name || "未命名文件夹";
   const items = Array.isArray(payload.items) ? payload.items : [];
   const folders = Array.isArray(payload.folders) ? payload.folders : [];
   document.title = `${name} · ClipNest 分享`;
 
-  clear(main);
+  const known = new Set(folders.map((f) => f.id));
+  snap.name = name;
+  snap.items = items;
+  snap.byId = new Map(folders.map((f) => [f.id, f]));
+  snap.byParent = new Map();
+  folders.forEach((f) => {
+    // 父引用断链的挂到根下，别让整个子树消失
+    const parent = known.has(f.parent_id) ? f.parent_id : null;
+    f.parent_id = parent;
+    if (!snap.byParent.has(parent)) snap.byParent.set(parent, []);
+    snap.byParent.get(parent).push(f);
+  });
+  snap.byParent.forEach((list) =>
+    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.name).localeCompare(String(b.name), "zh-Hans-CN"))
+  );
+  // 分享快照都不大，默认全展开：点开就能直接跳，省一次点击
+  snap.expanded = new Set(folders.map((f) => f.id));
+  snap.current = null;
+  snap.meta = meta;
+
   main.classList.remove("is-solo");
+  // 只有一层的分享没什么可切的，不占那 260px
+  if (folders.length) {
+    document.getElementById("share-page")?.classList.add("has-side");
+    renderSide();
+  }
+  renderMain();
+}
+
+/* ── 左侧目录树 ── */
+
+function sideRow({ iconName, label, count, active, depth = 0, twisty, onClick }) {
+  const row = h("div", `nav-item${active ? " is-active" : ""}${depth ? " tree-row" : ""}`);
+  if (depth) row.style.setProperty("--depth", String(depth));
+  if (twisty) {
+    const tw = h("button", `twisty${twisty.open ? " is-open" : ""}${twisty.leaf ? " is-leaf" : ""}`);
+    tw.type = "button";
+    tw.tabIndex = twisty.leaf ? -1 : 0;
+    tw.setAttribute("aria-label", twisty.open ? "折叠" : "展开");
+    tw.appendChild(icon("chevronRight", 12, 2.2));
+    tw.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      twisty.onToggle();
+    });
+    row.appendChild(tw);
+  }
+  const btn = h("button", "nav-main");
+  btn.type = "button";
+  if (active) btn.setAttribute("aria-current", "true");
+  const ic = icon(iconName, 15);
+  ic.classList.add("nav-icon");
+  btn.appendChild(ic);
+  btn.appendChild(h("span", "nav-label", label));
+  if (count > 0) btn.appendChild(h("span", "nav-count", String(count)));
+  btn.addEventListener("click", onClick);
+  row.appendChild(btn);
+  return row;
+}
+
+function renderSide() {
+  const side = document.getElementById("share-side");
+  if (!side) return;
+  clear(side);
+  side.hidden = false;
+
+  const scroll = h("div", "sidebar-scroll");
+  scroll.appendChild(
+    sideRow({
+      iconName: "grid",
+      label: snap.name,
+      count: snap.items.length,
+      active: snap.current === null,
+      onClick: () => select(null),
+    })
+  );
+
+  const section = h("div", "sidebar-section");
+  const heading = h("div", "sidebar-heading");
+  heading.appendChild(h("span", null, "子文件夹"));
+  heading.appendChild(h("span", null, String(snap.byId.size)));
+  section.appendChild(heading);
+  childFolders(null).forEach((f) => appendFolderRows(section, f, 0));
+  scroll.appendChild(section);
+
+  side.appendChild(scroll);
+}
+
+function appendFolderRows(container, folder, depth) {
+  const kids = childFolders(folder.id);
+  const open = snap.expanded.has(folder.id);
+  container.appendChild(
+    sideRow({
+      iconName: "folder",
+      label: folder.name ?? "",
+      // 和应用内一致：算上子文件夹，折叠时才不会显得内容凭空少了
+      count: itemsInSubtree(folder.id).length,
+      active: snap.current === folder.id,
+      depth,
+      twisty: {
+        open,
+        leaf: kids.length === 0,
+        onToggle: () => {
+          if (open) snap.expanded.delete(folder.id);
+          else snap.expanded.add(folder.id);
+          renderSide();
+        },
+      },
+      onClick: () => select(folder.id),
+    })
+  );
+  if (open) kids.forEach((kid) => appendFolderRows(container, kid, depth + 1));
+}
+
+function select(folderId) {
+  if (snap.current === folderId) return;
+  snap.current = folderId;
+  renderSide();
+  renderMain();
+  main.scrollTop = 0;
+  // 窄屏下滚动条在页面上，光复位 main 没用，得把内容区带回视野
+  if (window.matchMedia("(max-width: 860px)").matches) {
+    main.scrollIntoView({ block: "start" });
+  }
+}
+
+/* ── 右侧内容 ── */
+
+function renderMain() {
+  const scope = itemsInSubtree(snap.current);
+  const label = folderLabel(snap.current);
+
+  clear(main);
   const head = h("div", "share-head");
   const titleBox = h("div");
   titleBox.style.flex = "1";
   titleBox.style.minWidth = "0";
-  titleBox.appendChild(h("h1", "share-title", name));
-  const sub = folders.length
-    ? `文件夹 · 共 ${items.length} 条内容 · ${folders.length} 个子文件夹`
-    : `文件夹 · 共 ${items.length} 条内容`;
-  titleBox.appendChild(h("p", "state-text", sub));
+  titleBox.appendChild(h("h1", "share-title", label));
+  const subs = childFolders(snap.current).length;
+  titleBox.appendChild(
+    h("p", "state-text", subs ? `共 ${scope.length} 条内容 · ${subs} 个子文件夹` : `共 ${scope.length} 条内容`)
+  );
   head.appendChild(titleBox);
-  if (items.length) {
+  if (scope.length) {
     head.appendChild(
-      copyButton(() => items.map((it) => it.content ?? "").join("\n\n"), {
+      copyButton(() => scope.map((it) => it.content ?? "").join("\n\n"), {
         large: true,
         label: "复制全部",
       })
     );
   }
   main.appendChild(head);
-  main.appendChild(meta);
+  if (snap.meta) main.appendChild(snap.meta);
 
-  if (!items.length) {
+  if (!scope.length) {
     const box = h("div", "empty");
     box.appendChild(h("p", "empty-title", "这个文件夹是空的"));
     main.appendChild(box);
     return;
   }
 
-  // 按快照里的层级分组呈现，而不是摊平成一个大列表
-  const byParent = new Map();
-  const known = new Set(folders.map((f) => f.id));
-  folders.forEach((f) => {
-    // 父引用断链的挂到根下，别让整个子树消失
-    const parent = known.has(f.parent_id) ? f.parent_id : null;
-    if (!byParent.has(parent)) byParent.set(parent, []);
-    byParent.get(parent).push(f);
-  });
-  byParent.forEach((list) =>
-    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) ||
-      String(a.name).localeCompare(String(b.name), "zh-Hans-CN"))
-  );
-
-  const itemsOf = (fid) => items.filter((it) => (it.folder_id ?? null) === (fid ?? null));
-
+  // 视图内仍按层级分组：选了父目录时，子目录的内容不该摊成一锅
   let index = 0;
-  const walk = (folderId, label, depth) => {
+  const walk = (folderId, path, depth) => {
     const own = itemsOf(folderId);
-    if (own.length) {
-      main.appendChild(groupSection(label, own, depth, () => index++));
-    }
-    (byParent.get(folderId) || []).forEach((child) =>
-      walk(child.id, `${label} / ${child.name ?? ""}`, depth + 1)
+    if (own.length) main.appendChild(groupSection(path, own, depth, () => index++));
+    childFolders(folderId).forEach((child) =>
+      walk(child.id, `${path} / ${child.name ?? ""}`, depth + 1)
     );
   };
-  walk(null, name, 0);
+  // 分组标题只写相对当前视图的路径 —— 完整路径标题栏已经有了，重复一遍太占地方
+  walk(snap.current, snap.current == null ? snap.name : snap.byId.get(snap.current)?.name ?? "", 0);
 }
 
 /** 一个分组：标题 + 该层直属条目的卡片网格。 */
