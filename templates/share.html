@@ -1,2 +1,50 @@
 <!doctype html>
-<title>ClipNest 分享</title>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>ClipNest 分享</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+    <script>
+      // 与主应用共用同一个主题偏好 key，首帧前应用，避免闪白
+      (function () {
+        try {
+          var t = localStorage.getItem("clipnest_theme");
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- token 由 Flask 注入到 data 属性，JS 读取后调用 GET /api/public/<token> -->
+    <div class="share-page" id="share-page" data-token="{{ token }}">
+      <header class="share-top">
+        <a class="brand" href="/">
+          <svg class="brand-mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="8" y="3" width="8" height="4" rx="1.6" />
+            <path d="M16 5h2.5A1.5 1.5 0 0 1 20 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5A1.5 1.5 0 0 1 5.5 5H8" />
+            <path d="M8.5 12.5h7M8.5 16h4.5" />
+          </svg>
+          <span class="brand-name">ClipNest</span>
+        </a>
+        <span class="share-by">由 ClipNest 分享 · <a href="/">去首页</a></span>
+      </header>
+
+      <main class="share-main" id="share-main">
+        <div class="state-page">
+          <span class="spinner" aria-hidden="true"></span>
+          <p class="state-text">正在加载分享内容…</p>
+        </div>
+      </main>
+    </div>
+
+    <div class="toast-root" id="toast-root" role="status" aria-live="polite"></div>
+
+    <script type="module" src="{{ url_for('static', filename='js/share.js') }}"></script>
+  </body>
+</html>

@@ -1,0 +1,291 @@
+/* ClipNest 设计令牌
+ *
+ * 主题策略（三段式，保证手动切换两个方向都生效）：
+ *   1. :root                              → 浅色令牌（基线）
+ *   2. @media (prefers-color-scheme: dark) 内的 :root:not([data-theme="light"])
+ *                                          → 系统深色时自动转深，但用户手选浅色可覆盖
+ *   3. :root[data-theme="dark"]           → 用户手选深色，在系统为浅色时也生效
+ * 任何颜色都必须先在 :root 里有定义，媒体查询里只做覆盖。
+ */
+
+:root {
+  /* ── 表面 ── */
+  --bg: #faf9f5;
+  --bg-wash: #f2efe7;      /* 页面背景上的极轻晕染 */
+  --surface: #ffffff;      /* 卡片 / 面板 */
+  --surface-2: #f7f5ef;    /* 面板内的下沉块（内容预览、输入框） */
+  --surface-hover: #f2f0e9;
+  --border: #e5e2da;
+  --border-strong: #d6d2c6;
+
+  /* ── 文字 ── */
+  --text: #2b2a27;
+  --text-dim: #6b6862;
+  --text-faint: #918d84;
+
+  /* ── 主色（赤陶） ── */
+  --accent: #c15f3c;
+  --accent-hover: #a94f2f;
+  --accent-soft: rgba(193, 95, 60, 0.1);   /* 选中态底色 */
+  --accent-line: rgba(193, 95, 60, 0.28);
+  --on-accent: #ffffff;
+
+  /* ── 语义色 ── */
+  --success: #5c8f4a;
+  --success-soft: rgba(92, 143, 74, 0.12);
+  --danger: #b0453a;
+  --danger-hover: #96382e;
+  --danger-soft: rgba(176, 69, 58, 0.1);
+  --warn: #9a7020;
+
+  /* ── 阴影 ── */
+  --shadow-sm: 0 1px 2px rgba(43, 42, 39, 0.05);
+  --shadow-md: 0 2px 8px rgba(43, 42, 39, 0.07), 0 1px 2px rgba(43, 42, 39, 0.05);
+  --shadow-lg: 0 16px 48px rgba(43, 42, 39, 0.16), 0 2px 8px rgba(43, 42, 39, 0.08);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --scrim: rgba(43, 42, 39, 0.34);
+
+  /* ── 圆角 ── */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  /* ── 间距（4 的倍数） ── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+
+  /* ── 字体 ── */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", "Noto Sans Mono", monospace;
+
+  /* ── 尺寸 ── */
+  --topbar-h: 56px;
+  --sidebar-w: 248px;
+
+  /* ── 动效（prefers-reduced-motion 下会被清零） ── */
+  --t-fast: 120ms cubic-bezier(0.2, 0, 0.2, 1);
+  --t-mid: 180ms cubic-bezier(0.2, 0, 0.2, 1);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1f1e1d;
+    --bg-wash: #262421;
+    --surface: #262624;
+    --surface-2: #1c1b1a;
+    --surface-hover: #2f2e2b;
+    --border: #3a3937;
+    --border-strong: #4a4845;
+
+    --text: #f0eee6;
+    --text-dim: #9b9891;
+    --text-faint: #7d7a74;
+
+    --accent: #d97757;
+    --accent-hover: #e58a6d;
+    --accent-soft: rgba(217, 119, 87, 0.14);
+    --accent-line: rgba(217, 119, 87, 0.34);
+    --on-accent: #26150f;
+
+    --success: #7fb069;
+    --success-soft: rgba(127, 176, 105, 0.16);
+    --danger: #e0705f;
+    --danger-hover: #ec8776;
+    --danger-soft: rgba(224, 112, 95, 0.14);
+    --warn: #d9b45f;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.36);
+    --shadow-lg: 0 18px 52px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    --scrim: rgba(12, 11, 10, 0.62);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1f1e1d;
+  --bg-wash: #262421;
+  --surface: #262624;
+  --surface-2: #1c1b1a;
+  --surface-hover: #2f2e2b;
+  --border: #3a3937;
+  --border-strong: #4a4845;
+
+  --text: #f0eee6;
+  --text-dim: #9b9891;
+  --text-faint: #7d7a74;
+
+  --accent: #d97757;
+  --accent-hover: #e58a6d;
+  --accent-soft: rgba(217, 119, 87, 0.14);
+  --accent-line: rgba(217, 119, 87, 0.34);
+  --on-accent: #26150f;
+
+  --success: #7fb069;
+  --success-soft: rgba(127, 176, 105, 0.16);
+  --danger: #e0705f;
+  --danger-hover: #ec8776;
+  --danger-soft: rgba(224, 112, 95, 0.14);
+  --warn: #d9b45f;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.36);
+  --shadow-lg: 0 18px 52px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --scrim: rgba(12, 11, 10, 0.62);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-mid: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ══════════ 基础重置 ══════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* 显式上底色：主题令牌决定，不继承宿主 */
+  background-color: var(--bg);
+  /* 一层极轻的暖色晕染，避免大片纯色显得呆板 */
+  background-image: radial-gradient(
+    120% 80% at 50% -10%,
+    var(--bg-wash) 0%,
+    transparent 62%
+  );
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+svg {
+  display: block;
+  flex: none;
+}
+
+/* 统一的焦点环：只在键盘导航时出现 */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* 细滚动条，深浅主题都不刺眼 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 仅供屏幕阅读器 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

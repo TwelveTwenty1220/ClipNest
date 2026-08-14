@@ -1,2 +1,162 @@
 <!doctype html>
-<title>ClipNest</title>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="ClipNest —— 跨设备文本剪贴板：一台设备粘贴，另一台一键复制。" />
+    <title>ClipNest</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+    <script>
+      // 在首帧之前落实主题，避免深色用户看到白闪
+      (function () {
+        try {
+          var t = localStorage.getItem("clipnest_theme");
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- ══════════ 未登录：登录 / 注册 ══════════ -->
+    <div class="auth" id="auth-screen" hidden>
+      <div class="auth-inner">
+        <div class="auth-brand">
+          <svg class="brand-mark" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="8" y="3" width="8" height="4" rx="1.6" />
+            <path d="M16 5h2.5A1.5 1.5 0 0 1 20 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5A1.5 1.5 0 0 1 5.5 5H8" />
+            <path d="M8.5 12.5h7M8.5 16h4.5" />
+          </svg>
+          <span class="brand-name">ClipNest</span>
+        </div>
+        <p class="auth-tagline">在一台设备粘贴，在另一台一键复制。</p>
+
+        <div class="auth-card">
+          <div class="auth-tabs" role="tablist" aria-label="登录或注册">
+            <button class="auth-tab" id="auth-tab-login" role="tab" type="button" aria-selected="true" aria-controls="auth-form">登录</button>
+            <button class="auth-tab" id="auth-tab-register" role="tab" type="button" aria-selected="false" aria-controls="auth-form">注册</button>
+          </div>
+
+          <form class="auth-form" id="auth-form" novalidate>
+            <div class="field">
+              <label class="field-label" for="auth-username">用户名</label>
+              <input class="input" id="auth-username" name="username" type="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="auth-password">密码</label>
+              <input class="input" id="auth-password" name="password" type="password" autocomplete="current-password" required />
+              <span class="field-hint" id="auth-password-hint" hidden>至少 8 位</span>
+            </div>
+
+            <div class="field" id="auth-invite-field" hidden>
+              <label class="field-label" for="auth-invite">邀请码</label>
+              <input class="input" id="auth-invite" name="invite_code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" style="font-family: var(--font-mono); letter-spacing: 0.08em" />
+              <span class="field-hint">向管理员索取，每 10 分钟轮换一次</span>
+            </div>
+
+            <p class="form-error" id="auth-error" role="alert" hidden></p>
+
+            <button class="btn btn-primary btn-block" id="auth-submit" type="submit">登录</button>
+          </form>
+        </div>
+
+        <p class="auth-foot">私有工具 · 注册需要邀请码</p>
+      </div>
+    </div>
+
+    <!-- ══════════ 已登录：主界面 ══════════ -->
+    <div class="app" id="app" hidden>
+      <header class="topbar">
+        <button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="打开侧栏" aria-expanded="false" aria-controls="sidebar">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
+
+        <a class="brand" id="brand-home" href="#" aria-label="ClipNest 首页">
+          <svg class="brand-mark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="8" y="3" width="8" height="4" rx="1.6" />
+            <path d="M16 5h2.5A1.5 1.5 0 0 1 20 6.5V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5A1.5 1.5 0 0 1 5.5 5H8" />
+            <path d="M8.5 12.5h7M8.5 16h4.5" />
+          </svg>
+          <span class="brand-name">ClipNest</span>
+        </a>
+
+        <div class="topbar-search" id="search-wrap">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.6-3.6" />
+          </svg>
+          <input class="input" id="search-input" type="search" placeholder="搜索标题与内容" aria-label="搜索条目" autocomplete="off" spellcheck="false" />
+          <span class="kbd search-hint" aria-hidden="true">/</span>
+          <button class="icon-btn search-clear" id="search-clear" type="button" aria-label="清除搜索" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="topbar-right">
+          <span class="conn-badge" id="conn-badge" role="status" hidden>
+            <span class="conn-dot" aria-hidden="true"></span>连接中断
+          </span>
+
+          <button class="btn btn-primary btn-responsive" id="new-item-btn" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span class="btn-text">新建条目</span>
+          </button>
+
+          <span class="topbar-divider" aria-hidden="true"></span>
+
+          <button class="icon-btn" id="theme-btn" type="button" aria-label="切换主题"></button>
+
+          <button class="icon-btn" id="admin-btn" type="button" aria-label="管理员面板" hidden>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3 5 6v5.5c0 4.2 2.9 8.1 7 9.5 4.1-1.4 7-5.3 7-9.5V6z" />
+              <path d="m9.5 12 1.8 1.8 3.4-3.6" />
+            </svg>
+          </button>
+
+          <div class="menu-anchor" id="user-anchor">
+            <button class="user-btn" id="user-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu">
+              <span class="avatar" id="user-avatar" aria-hidden="true"></span>
+              <span class="user-name" id="user-name"></span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="color: var(--text-faint)">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div class="menu" id="user-menu" role="menu" aria-labelledby="user-btn" hidden></div>
+          </div>
+        </div>
+      </header>
+
+      <nav class="sidebar" id="sidebar" aria-label="文件夹">
+        <div class="sidebar-scroll" id="sidebar-nav"></div>
+        <div class="sidebar-foot">
+          <button class="btn btn-ghost btn-block btn-sm" id="new-folder-btn" type="button" style="justify-content: flex-start">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            新建文件夹
+          </button>
+        </div>
+      </nav>
+      <div class="drawer-scrim" id="drawer-scrim" hidden></div>
+
+      <main class="main" id="main" tabindex="-1">
+        <div class="main-inner" id="view"></div>
+      </main>
+    </div>
+
+    <div id="modal-root"></div>
+    <div class="toast-root" id="toast-root" role="status" aria-live="polite"></div>
+
+    <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>
