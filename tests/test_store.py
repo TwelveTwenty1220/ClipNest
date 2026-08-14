@@ -74,7 +74,7 @@ def test_first_pull_is_full(alice):
 def test_pull_with_current_rev_reports_unchanged(alice):
     rev = snapshot(alice)["rev"]
     data = ok(alice.get(f"/api/store?rev={rev}"))
-    assert data == {"changed": False, "rev": rev}
+    assert data == {"changed": False, "rev": rev, "inbox_count": 0}
 
 
 def test_write_bumps_rev_and_pull_returns_full(alice):
@@ -357,3 +357,44 @@ def test_all_endpoints_require_auth(anon):
     err(anon.post("/api/store/items", json={"content": "c"}), "unauthorized", 401)
     err(anon.patch("/api/store/items/i_1", json={"content": "c"}), "unauthorized", 401)
     err(anon.delete("/api/store/items/i_1"), "unauthorized", 401)
+
+
+# ── 收件箱角标 ───────────────────────────────────────────
+
+def test_inbox_count_is_sent_even_when_unchanged(app, alice, bob):
+    """收到分享不会改动接收方的 store rev，所以 changed:false 也必须带 inbox_count。
+
+    否则侧栏的未读角标永远不会亮 —— 前端只轮询 /api/store。
+    """
+    from app import storage
+
+    rev = snapshot(alice)["rev"]
+    assert ok(alice.get(f"/api/store?rev={rev}")) == {
+        "changed": False,
+        "rev": rev,
+        "inbox_count": 0,
+    }
+
+    item = mkitem(bob, content="PORT=8420", title="配置")
+    ok(bob.post("/api/share/direct", json={"to": "alice", "kind": "item", "id": item["id"]}), 201)
+
+    # alice 的 store 一个字节都没变，rev 仍然相等
+    with app.app_context():
+        assert storage.load_store(storage.get_user("alice")["uid"])["rev"] == rev
+
+    unchanged = ok(alice.get(f"/api/store?rev={rev}"))
+    assert unchanged["changed"] is False
+    assert unchanged["rev"] == rev
+    assert unchanged["inbox_count"] == 1
+
+
+def test_inbox_count_drops_after_accept(alice, bob):
+    item = mkitem(bob, content="x")
+    ok(bob.post("/api/share/direct", json={"to": "alice", "kind": "item", "id": item["id"]}), 201)
+
+    sid = ok(alice.get("/api/share/inbox"))["shares"][0]["id"]
+    ok(alice.post(f"/api/share/inbox/{sid}/accept", json={"folder_id": None}))
+
+    # 已接受的不再计入角标，但记录仍留在收件箱
+    assert ok(alice.get("/api/store"))["inbox_count"] == 0
+    assert len(ok(alice.get("/api/share/inbox"))["shares"]) == 1

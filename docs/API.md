@@ -212,7 +212,7 @@ DEFAULT_TITLE = "未命名"
 未变化 **200**：
 
 ```json
-{ "changed": false, "rev": 42 }
+{ "changed": false, "rev": 42, "inbox_count": 2 }
 ```
 
 有变化 **200**：
@@ -228,6 +228,8 @@ DEFAULT_TITLE = "未命名"
 ```
 
 `inbox_count` 为收件箱中未接受（`accepted_at == null`）的分享数量，供前端在侧栏显示红点。
+
+**两条分支都必须带 `inbox_count`**：收到分享只写接收方的 `inbox.json`，不会改动其 `store.json` 的 `rev`。若只在 `changed: true` 时下发，未读角标就永远不会亮。
 
 ### `POST /api/store/folders`
 

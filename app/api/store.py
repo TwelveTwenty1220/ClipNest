@@ -58,8 +58,13 @@ def get_store():
 
     uid = _uid()
     store = storage.load_store(uid)
+
+    # inbox_count 两条分支都要给：收到分享只写对方的 inbox.json，不会动我的
+    # store rev，所以未变化的响应里若不带它，侧栏的未读角标永远不会亮
+    inbox_count = _inbox_count(uid)
+
     if client_rev == store["rev"]:
-        return jsonify({"changed": False, "rev": store["rev"]})
+        return jsonify({"changed": False, "rev": store["rev"], "inbox_count": inbox_count})
 
     return jsonify(
         {
@@ -67,7 +72,7 @@ def get_store():
             "rev": store["rev"],
             "folders": _sorted_folders(store),
             "items": _sorted_items(store),
-            "inbox_count": _inbox_count(uid),
+            "inbox_count": inbox_count,
         }
     )
 
