@@ -207,36 +207,13 @@ function renderState(title, text) {
   main.appendChild(box);
 }
 
-/** 快照内的相对路径：folders[].parent_id 指向快照内的 id，根为 null。 */
-function buildPathMap(rootName, folders) {
-  const byId = new Map();
-  (folders || []).forEach((f) => {
-    if (f && f.id) byId.set(f.id, f);
-  });
-  const cache = new Map();
-  const pathOf = (fid) => {
-    if (!fid) return rootName;
-    if (cache.has(fid)) return cache.get(fid);
-    const parts = [];
-    let cur = byId.get(fid);
-    let guard = 0;
-    while (cur && guard++ < 32) {
-      parts.unshift(cur.name ?? "");
-      cur = cur.parent_id ? byId.get(cur.parent_id) : null;
-    }
-    const full = [rootName, ...parts].join(" / ");
-    cache.set(fid, full);
-    return full;
-  };
-  return pathOf;
-}
-
 function renderItemPayload(payload, meta) {
   const item = payload.item || {};
   const title = item.title || DEFAULT_TITLE;
   document.title = `${title} · ClipNest 分享`;
 
   clear(main);
+  main.classList.add("is-solo");
   const head = h("div", "share-head");
   head.appendChild(h("h1", "share-title", title));
   head.appendChild(copyButton(() => item.content ?? "", { large: true }));
@@ -256,17 +233,20 @@ function renderItemPayload(payload, meta) {
 function renderFolderPayload(payload, meta) {
   const name = payload.name || "未命名文件夹";
   const items = Array.isArray(payload.items) ? payload.items : [];
+  const folders = Array.isArray(payload.folders) ? payload.folders : [];
   document.title = `${name} · ClipNest 分享`;
-  const pathOf = buildPathMap(name, payload.folders);
 
   clear(main);
+  main.classList.remove("is-solo");
   const head = h("div", "share-head");
   const titleBox = h("div");
   titleBox.style.flex = "1";
   titleBox.style.minWidth = "0";
-  const t = h("h1", "share-title", name);
-  titleBox.appendChild(t);
-  titleBox.appendChild(h("p", "state-text", `文件夹 · 共 ${items.length} 条内容`));
+  titleBox.appendChild(h("h1", "share-title", name));
+  const sub = folders.length
+    ? `文件夹 · 共 ${items.length} 条内容 · ${folders.length} 个子文件夹`
+    : `文件夹 · 共 ${items.length} 条内容`;
+  titleBox.appendChild(h("p", "state-text", sub));
   head.appendChild(titleBox);
   if (items.length) {
     head.appendChild(
@@ -286,31 +266,78 @@ function renderFolderPayload(payload, meta) {
     return;
   }
 
-  // 平铺全部条目，每条标注它在快照里的路径
-  items.forEach((item, i) => {
-    const card = h("div", "share-item");
-    card.style.animationDelay = `${Math.min(i, 12) * 20}ms`;
+  // 按快照里的层级分组呈现，而不是摊平成一个大列表
+  const byParent = new Map();
+  const known = new Set(folders.map((f) => f.id));
+  folders.forEach((f) => {
+    // 父引用断链的挂到根下，别让整个子树消失
+    const parent = known.has(f.parent_id) ? f.parent_id : null;
+    if (!byParent.has(parent)) byParent.set(parent, []);
+    byParent.get(parent).push(f);
+  });
+  byParent.forEach((list) =>
+    list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) ||
+      String(a.name).localeCompare(String(b.name), "zh-Hans-CN"))
+  );
 
-    const ih = h("div", "share-item-head");
-    const titles = h("div", "share-item-titles");
-    titles.appendChild(h("div", "row-title", item.title || DEFAULT_TITLE));
-    const path = h("div", "share-path");
-    path.appendChild(document.createTextNode(pathOf(item.folder_id ?? null)));
-    titles.appendChild(path);
-    ih.appendChild(titles);
-    ih.appendChild(copyButton(() => item.content ?? "", { label: "复制" }));
-    card.appendChild(ih);
+  const itemsOf = (fid) => items.filter((it) => (it.folder_id ?? null) === (fid ?? null));
+
+  let index = 0;
+  const walk = (folderId, label, depth) => {
+    const own = itemsOf(folderId);
+    if (own.length) {
+      main.appendChild(groupSection(label, own, depth, () => index++));
+    }
+    (byParent.get(folderId) || []).forEach((child) =>
+      walk(child.id, `${label} / ${child.name ?? ""}`, depth + 1)
+    );
+  };
+  walk(null, name, 0);
+}
+
+/** 一个分组：标题 + 该层直属条目的卡片网格。 */
+function groupSection(label, list, depth, nextIndex) {
+  const section = h("section", "share-group");
+  if (depth) section.style.setProperty("--depth", String(Math.min(depth, 4)));
+
+  const head = h("div", "share-group-head");
+  const title = h("h2", "share-group-title");
+  title.appendChild(icon("folder", 14, 2));
+  title.appendChild(h("span", null, label));
+  head.appendChild(title);
+  head.appendChild(h("span", "share-group-count", `${list.length} 条`));
+  head.appendChild(
+    copyButton(() => list.map((it) => it.content ?? "").join("\n\n"), { label: "复制本组" })
+  );
+  section.appendChild(head);
+
+  const grid = h("div", "grid");
+  list.forEach((item) => {
+    const i = nextIndex();
+    const card = h("article", "card");
+    // 入场动画只给首屏几张，几百张一起动会让滚动发闷
+    if (i < 18) card.style.animationDelay = `${i * 18}ms`;
+    else card.style.animation = "none";
+
+    const ch = h("div", "card-head");
+    ch.appendChild(h("h3", "card-title", item.title || DEFAULT_TITLE));
+    ch.appendChild(copyButton(() => item.content ?? "", { label: "复制" }));
+    card.appendChild(ch);
 
     const media = h("div", "card-media");
     const preview = contentPreview(item.content ?? "");
     if (preview) media.appendChild(preview);
-    const body = h("div", "share-item-body");
-    body.textContent = item.content ?? "";
+    const body = h("div", "card-body");
+    const bodyText = h("div", "card-body-text");
+    bodyText.textContent = item.content ?? "";
+    body.appendChild(bodyText);
     media.appendChild(body);
     card.appendChild(media);
 
-    main.appendChild(card);
+    grid.appendChild(card);
   });
+  section.appendChild(grid);
+  return section;
 }
 
 function buildMeta(data) {

@@ -1033,10 +1033,21 @@ function openItemDetail(item) {
 
 /* ── 批量选择 ── */
 
-function clearSelection({ rerender = true } = {}) {
+function clearSelection() {
   if (!state.selection.size) return;
   state.selection.clear();
-  if (rerender) renderView();
+  syncPickedUI();
+  mountSelectionBar();
+}
+
+/** 把选中状态刷到已经渲染出来的卡片上，避免整树重建。 */
+function syncPickedUI() {
+  document.querySelectorAll("article.card").forEach((card) => {
+    const on = state.selection.has(card.dataset.itemId);
+    card.classList.toggle("is-picked", on);
+    const box = card.querySelector(".card-pick input");
+    if (box) box.checked = on;
+  });
 }
 
 /** 当前视图里可见的条目，用于"全选"。 */
@@ -1063,7 +1074,8 @@ function selectionBar() {
   all.addEventListener("click", () => {
     if (allPicked) visible.forEach((id) => state.selection.delete(id));
     else visible.forEach((id) => state.selection.add(id));
-    renderView();
+    syncPickedUI();
+    mountSelectionBar();
   });
 
   const move = h("button", "btn btn-sm btn-primary");
@@ -1187,7 +1199,9 @@ function openFolderMenu(anchor, folder) {
 function itemCard(item, index, { showFolder = false } = {}) {
   const card = h("article", `card${item.pinned ? " is-pinned" : ""}`);
   card.dataset.itemId = item.id; // 供"全选本页"识别当前渲染出来的条目
-  card.style.animationDelay = `${Math.min(index, 12) * 18}ms`;
+  // 只给首屏几张做入场动画。几百张一起动会让滚动和点击都发闷
+  if (index < 18) card.style.animationDelay = `${index * 18}ms`;
+  else card.style.animation = "none";
   card.draggable = true;
   card.addEventListener("dragstart", (ev) => {
     state.dragItemId = item.id;
@@ -1216,7 +1230,9 @@ function itemCard(item, index, { showFolder = false } = {}) {
     if (box.checked) state.selection.add(item.id);
     else state.selection.delete(item.id);
     card.classList.toggle("is-picked", box.checked);
-    renderView();
+    // 只更新操作条，不重绘网格 —— 重绘 300 多张卡片会连带重放入场动画，
+    // 表现就是每点一下整页闪一下
+    mountSelectionBar();
   });
   pick.appendChild(box);
   head.appendChild(pick);
@@ -1249,11 +1265,15 @@ function itemCard(item, index, { showFolder = false } = {}) {
   if (preview) media.appendChild(preview);
 
   const body = h("div", "card-body");
-  if (item.content) body.textContent = item.content;
+  // 文字放内层：.card-body 是 flex 子项，display:-webkit-box 会被浏览器
+  // blockify 掉，line-clamp 随之失效，只剩硬切出半个字
+  const bodyText = h("div", "card-body-text");
+  if (item.content) bodyText.textContent = item.content;
   else {
     body.classList.add("is-empty");
-    body.textContent = "（空内容）";
+    bodyText.textContent = "（空内容）";
   }
+  body.appendChild(bodyText);
   // 卡片里的内容被截到 4 行，点一下看全文
   body.tabIndex = 0;
   body.setAttribute("role", "button");
