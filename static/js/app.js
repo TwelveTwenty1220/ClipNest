@@ -16,7 +16,12 @@ import {
   clearToken,
   setUnauthorizedHandler,
 } from "./api.js";
-import { crosshairPreview } from "./crosshair.js";
+
+/* 可选的内容预览插件。装了就用，没装就只是没有预览 —— 它不随仓库分发，
+ * 所以这里必须容错，不能让整个应用因为少一个文件就挂掉。
+ * 插件自己决定什么内容值得预览、以及往哪个目录下才生效。 */
+const previewPlugin = await import("./preview.js").catch(() => null);
+const contentPreview = previewPlugin?.contentPreview ?? (() => null);
 
 /* ══════════════════════════════════════════════════
    常量
@@ -42,6 +47,7 @@ const MAX_DEPTH_GUARD = 32; // 防御性：接口数据若成环，不至于死�
 
 const ICONS = {
   grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
   folder:
     '<path d="M3 8a2 2 0 0 1 2-2h3.6a2 2 0 0 1 1.4.6L11.5 8H19a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   folderPlus:
@@ -316,7 +322,8 @@ const state = {
   items: [],
   inboxCount: 0,
   view: { type: "all" },
-  query: "",
+  query: "", // 顶栏的全局搜索
+  folderQuery: "", // 文件夹页内的就地搜索，换文件夹即清空
   expanded: loadExpanded(),
   offline: false,
   dragItemId: null,
@@ -387,6 +394,13 @@ function folderLabel(id) {
   return p.length ? p.map((f) => f.name).join(" / ") : "根目录";
 }
 
+/** 只要最后一级。卡片上的标签空间有限，"项目 / 配置 / 生产 / 数据库"
+ *  截断后剩下的恰恰是最没用的前几级，真正想知道的"是哪个分类"反而被切掉了。
+ *  完整路径放到 title 里，鼠标悬停可见。 */
+function folderLeaf(id) {
+  return folderById(id)?.name ?? "根目录";
+}
+
 /** 文件夹自身及全部后代的 id 集合。 */
 function subtreeIds(id) {
   const out = new Set([id]);
@@ -420,16 +434,28 @@ function itemsOfFolder(folderId) {
   );
 }
 
+/** 文件夹及其全部子文件夹里的条目。
+ *
+ * 侧栏计数、文件夹视图、按文件夹搜索都用这个 —— 三处必须是同一个口径，
+ * 否则会出现"侧栏标着 123、点进去显示 0 条"这种自相矛盾的情况。 */
+function itemsInSubtree(folderId) {
+  if (folderId == null) return sortItems(state.items);
+  const ids = subtreeIds(folderId);
+  return sortItems(state.items.filter((it) => ids.has(it.folder_id ?? null)));
+}
+
+function matchesQuery(item, q) {
+  return (
+    String(item.title ?? "").toLowerCase().includes(q) ||
+    String(item.content ?? "").toLowerCase().includes(q)
+  );
+}
+
+/** 顶栏搜索：始终跨全部文件夹。文件夹内的就地搜索见 renderItems。 */
 function searchItems(query) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return sortItems(
-    state.items.filter(
-      (it) =>
-        String(it.title ?? "").toLowerCase().includes(q) ||
-        String(it.content ?? "").toLowerCase().includes(q)
-    )
-  );
+  return sortItems(state.items.filter((it) => matchesQuery(it, q)));
 }
 
 /* ══════════════════════════════════════════════════
@@ -741,6 +767,8 @@ function buildMenuEntries(menu, entries, closeFn) {
 
 function setView(view, { closeDrawer = true } = {}) {
   state.view = view;
+  // 页内搜索是"这个文件夹里找"，换了文件夹就该清空，不然会一头雾水
+  state.folderQuery = "";
   saveView();
   if (view.type === "folder" && view.id) {
     // 自动展开到该文件夹，免得用户切过去看不到自己在哪
@@ -780,6 +808,7 @@ function navItem({
   depth = 0,
   onClick,
   onMore,
+  onQuickAdd,
   dropFolderId,
   twisty,
 }) {
@@ -814,6 +843,19 @@ function navItem({
   }
   main.addEventListener("click", onClick);
   row.appendChild(main);
+
+  // 直接往这个文件夹里加一条，省掉"新建条目 → 再选文件夹"两步
+  if (onQuickAdd) {
+    const add = iconButton("plus", `在「${label}」中新建条目`, {
+      className: "row-add",
+      size: 14,
+    });
+    add.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onQuickAdd();
+    });
+    row.appendChild(add);
+  }
 
   if (onMore) {
     const more = iconButton("more", "更多操作", { className: "row-more", size: 14 });
@@ -909,7 +951,8 @@ function appendFolderRows(container, folder, depth) {
       iconName: "folder",
       label: folder.name,
       active: state.view.type === "folder" && state.view.id === folder.id,
-      count: itemsOfFolder(folder.id).length,
+      // 含子文件夹的总数：折叠状态下只显示直属条目数会让人以为内容丢了
+      count: itemsInSubtree(folder.id).length,
       depth,
       dropFolderId: folder.id,
       twisty: {
@@ -923,6 +966,7 @@ function appendFolderRows(container, folder, depth) {
         },
       },
       onClick: () => setView({ type: "folder", id: folder.id }),
+      onQuickAdd: () => openItemEditor(null, folder.id),
       onMore: (anchor) => openFolderMenu(anchor, folder),
     })
   );
@@ -990,8 +1034,10 @@ function itemCard(item, index, { showFolder = false } = {}) {
   card.appendChild(head);
 
   const media = h("div", "card-media");
-  // 内容是无畏契约配置片段时，左边补一张预览；不是就整行都给文本
-  const preview = crosshairPreview(item.content);
+  // 插件认得这段内容就在左边补一张预览，不认得就整行都给文本
+  const preview = contentPreview(item.content, {
+    folderPath: item.folder_id ? folderLabel(item.folder_id) : "",
+  });
   if (preview) media.appendChild(preview);
 
   const body = h("div", "card-body");
@@ -1016,7 +1062,7 @@ function itemCard(item, index, { showFolder = false } = {}) {
   if (showFolder) {
     const tag = h("span", "tag");
     tag.appendChild(icon("folder", 11, 2));
-    tag.appendChild(h("span", null, item.folder_id ? folderLabel(item.folder_id) : "根目录"));
+    tag.appendChild(h("span", null, item.folder_id ? folderLeaf(item.folder_id) : "根目录"));
     tag.title = item.folder_id ? folderLabel(item.folder_id) : "根目录";
     foot.appendChild(tag);
   }
@@ -1101,6 +1147,49 @@ function renderView() {
   }
 }
 
+/** 文件夹页内的搜索框。就地过滤当前文件夹（含子文件夹），
+ *  与顶栏那个"跨全部文件夹"的搜索各管各的，省得为了在本文件夹里
+ *  找一条内容还要跑回左上角。 */
+function folderSearchBox(folder) {
+  const wrap = h("div", "inline-search");
+  wrap.appendChild(icon("search", 15, 2));
+
+  const input = h("input", "inline-search-input");
+  input.type = "search";
+  input.value = state.folderQuery;
+  input.placeholder = `在「${folder.name}」中搜索`;
+  input.setAttribute("aria-label", `在「${folder.name}」及其子文件夹中搜索`);
+  input.autocomplete = "off";
+  input.spellcheck = false;
+
+  const clearBtn = iconButton("x", "清除", { size: 13 });
+  clearBtn.classList.add("inline-search-clear");
+  clearBtn.hidden = !state.folderQuery;
+
+  const apply = (value) => {
+    state.folderQuery = value;
+    renderView();
+    // 重绘会换掉输入框，焦点和光标位置要接回去
+    const next = $(".inline-search-input");
+    if (next) {
+      next.focus();
+      next.setSelectionRange(next.value.length, next.value.length);
+    }
+  };
+
+  input.addEventListener("input", () => apply(input.value));
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && input.value) {
+      ev.stopPropagation();
+      apply("");
+    }
+  });
+  clearBtn.addEventListener("click", () => apply(""));
+
+  wrap.append(input, clearBtn);
+  return wrap;
+}
+
 function viewHead(root, { titleText, sub, crumbs, actions }) {
   const head = h("div", "view-head");
   const left = h("div");
@@ -1153,9 +1242,15 @@ function renderItems(root, folderId) {
     return;
   }
 
-  const list = isAll ? sortItems(state.items) : itemsOfFolder(folderId);
+  // 文件夹视图连子文件夹的内容一起显示，与侧栏计数同口径
+  const kids = isAll ? [] : childFolders(folderId);
+  const all = isAll ? sortItems(state.items) : itemsInSubtree(folderId);
+  // 页内搜索就地过滤，不跳到"搜索结果"页 —— 人还在这个文件夹里
+  const fq = isAll ? "" : state.folderQuery.trim().toLowerCase();
+  const list = fq ? all.filter((it) => matchesQuery(it, fq)) : all;
   const actions = [];
   if (!isAll) {
+    actions.push(folderSearchBox(folder));
     const shareBtn = labeledButton("share", "分享文件夹", "btn btn-sm");
     shareBtn.addEventListener("click", () =>
       openShareModal({ kind: "folder", id: folder.id, name: folder.name })
@@ -1166,14 +1261,26 @@ function renderItems(root, folderId) {
     actions.push(subBtn);
   }
 
+  const scopeNote = kids.length ? ` · 含 ${kids.length} 个子文件夹` : "";
   viewHead(root, {
     titleText: isAll ? "全部条目" : folder.name,
-    sub: `${list.length} 条${isAll ? "" : "（当前文件夹）"}`,
+    sub: fq
+      ? `“${state.folderQuery.trim()}” 匹配 ${list.length} / 共 ${all.length} 条${scopeNote}`
+      : `${all.length} 条${isAll ? "" : scopeNote}`,
     crumbs: isAll ? null : buildCrumbs(folderId),
     actions: actions.length ? actions : null,
   });
 
   if (!list.length) {
+    if (fq) {
+      root.appendChild(
+        emptyState(
+          "这个文件夹里没有匹配的内容",
+          `「${folder.name}」及其子文件夹里没找到“${state.folderQuery.trim()}”，用顶栏的搜索框可以搜全部文件夹。`
+        )
+      );
+      return;
+    }
     root.appendChild(
       emptyState(
         "这里还没有内容",
@@ -1188,7 +1295,9 @@ function renderItems(root, folderId) {
   }
 
   const grid = h("div", "grid");
-  list.forEach((item, i) => grid.appendChild(itemCard(item, i, { showFolder: isAll })));
+  // 有子文件夹时给每张卡片标出出处，否则分不清哪条来自哪个子文件夹
+  const showFolder = isAll || kids.length > 0;
+  list.forEach((item, i) => grid.appendChild(itemCard(item, i, { showFolder })));
   root.appendChild(grid);
 }
 
@@ -2815,7 +2924,10 @@ function wireEvents() {
     setView({ type: "all" });
   });
   $("#new-item-btn").addEventListener("click", () => openItemEditor(null, currentFolderId()));
-  $("#new-folder-btn").addEventListener("click", () => createFolder(currentFolderId()));
+  // 建在根级：按钮写的就是"新建文件夹"。建子文件夹有专门的入口
+  // （文件夹行的 ⋯ 菜单、文件夹页头部的按钮），不能让这个跟着当前选中走，
+  // 否则选中任何文件夹后就再也建不出同级目录了。
+  $("#new-folder-btn").addEventListener("click", () => createFolder(null));
   $("#admin-btn").addEventListener("click", () => setView({ type: "admin" }));
   $("#user-btn").addEventListener("click", toggleUserMenu);
 
@@ -2823,6 +2935,7 @@ function wireEvents() {
   const clearBtn = $("#search-clear");
   search.addEventListener("input", () => {
     state.query = search.value;
+    if (!search.value.trim()) state.searchAll = false;
     $("#search-wrap").classList.toggle("has-value", !!search.value);
     clearBtn.hidden = !search.value;
     renderView();

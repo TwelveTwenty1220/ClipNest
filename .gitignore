@@ -48,6 +48,16 @@ gunicorn.pid
 cloudflared.log
 tunnel-*.json
 
+# ── 个人扩展（不随仓库分发）─────────────────────────
+# 可选的内容预览插件与配套的个人数据。应用检测不到就只是没有预览，
+# 功能不受影响，所以这些留在本地。
+/static/js/preview.js
+/static/js/crosshair.js
+/app/crosshair.py
+/tests/test_crosshair.py
+/tests/data/crosshair_corpus.json
+/scripts/seed_valorant_crosshairs.py
+
 # ── 工具产物 ─────────────────────────────────────────
 .claude/
 

@@ -743,7 +743,8 @@
   visibility: hidden;
 }
 
-.row-more {
+.row-more,
+.row-add {
   width: 20px;
   height: 20px;
   border-radius: var(--r-xs);
@@ -759,17 +760,27 @@
 .nav-item:hover .row-more,
 .nav-item:focus-within .row-more,
 .row-more:focus-visible,
-.row-more.is-open {
+.row-more.is-open,
+.nav-item:hover .row-add,
+.nav-item:focus-within .row-add,
+.row-add:focus-visible {
   opacity: 1;
 }
 
-.row-more:hover {
+.row-more:hover,
+.row-add:hover {
   background: var(--border);
   color: var(--text);
 }
 
+/* 快速添加是"往里放东西"，用主色点一下，和"更多操作"区分开 */
+.row-add:hover {
+  color: var(--accent);
+}
+
 @media (hover: none) {
-  .row-more {
+  .row-more,
+  .row-add {
     opacity: 1;
   }
 }
@@ -853,6 +864,67 @@ button.crumb:hover {
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* 文件夹页内的搜索框 —— 顶栏那个搜全部，这个只搜当前文件夹 */
+.inline-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 32px;
+  padding: 0 var(--s-2) 0 var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text-faint);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+
+.inline-search:focus-within {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.inline-search-input {
+  width: 168px;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.inline-search-input::placeholder {
+  color: var(--text-faint);
+}
+
+/* 浏览器自带的 search 清除按钮和我们自己的会重复 */
+.inline-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.inline-search-clear {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-xs);
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  flex: none;
+}
+
+.inline-search-clear:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .inline-search-input {
+    width: 120px;
+  }
 }
 
 /* ── 条目卡片网格 ── */
@@ -993,41 +1065,6 @@ button.crumb:hover {
   height: calc(var(--body-lines) * 1.65em + 2 * var(--s-3));
 }
 
-/* ── 无畏契约配置预览 ──
-   底色用中性暖灰而不是深色：职业选手里用纯黑配置的很多，靠黑色描边
-   成型的造型配置也不少，深色底上它们会整个糊掉。淡棋盘格提示这是
-   预览画布，同时让黑白两端都有对比。*/
-.xhair {
-  flex: 0 0 auto;
-  width: calc(var(--body-lines, 4) * 1.65em + 2 * var(--s-3));
-  font-size: 12px; /* 让上面的 em 与 .card-body 同基准 */
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  background-color: #6f6b64;
-  background-image: linear-gradient(
-      45deg,
-      rgba(0, 0, 0, 0.06) 25%,
-      transparent 25%,
-      transparent 75%,
-      rgba(0, 0, 0, 0.06) 75%
-    ),
-    linear-gradient(
-      45deg,
-      rgba(0, 0, 0, 0.06) 25%,
-      transparent 25%,
-      transparent 75%,
-      rgba(0, 0, 0, 0.06) 75%
-    );
-  background-size: 14px 14px;
-  background-position: 0 0, 7px 7px;
-}
-
-.xhair svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
 
 .card-body.is-empty {
   color: var(--text-faint);
@@ -1896,6 +1933,12 @@ button.crumb:hover {
   white-space: nowrap;
 }
 
+/* 分享页的内容行沿用卡片那套，只是外边距不同 */
+.share-item .card-media {
+  margin: 0 var(--s-4) var(--s-4);
+  align-items: flex-start;
+}
+
 .share-item-body {
   flex: 1;
   min-width: 0;
@@ -1912,23 +1955,6 @@ button.crumb:hover {
   overflow: auto;
 }
 
-/* 分享页的内容行沿用卡片那套，只是外边距不同 */
-.share-item .card-media {
-  margin: 0 var(--s-4) var(--s-4);
-  align-items: flex-start;
-}
-
-.share-item .xhair {
-  width: 96px;
-  height: 96px;
-}
-
-/* 单条目分享页：预览可以大一点，它是这一页的主角 */
-.xhair-lg {
-  width: 200px;
-  height: 200px;
-  margin: 0 auto var(--s-4);
-}
 
 .state-page {
   display: flex;

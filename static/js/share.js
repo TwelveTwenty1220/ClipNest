@@ -5,7 +5,10 @@
  */
 
 import { api, ApiError } from "./api.js";
-import { crosshairPreview } from "./crosshair.js";
+
+/* 与主应用同一个可选预览插件；没装就只是没有预览。 */
+const previewPlugin = await import("./preview.js").catch(() => null);
+const contentPreview = previewPlugin?.contentPreview ?? (() => null);
 
 const LS_THEME = "clipnest_theme";
 const COPIED_MS = 1500;
@@ -240,9 +243,8 @@ function renderItemPayload(payload, meta) {
   main.appendChild(head);
   main.appendChild(meta);
 
-  const preview = crosshairPreview(item.content ?? "");
+  const preview = contentPreview(item.content ?? "", { large: true });
   if (preview) {
-    preview.classList.add("xhair-lg");
     main.appendChild(preview);
   }
 
@@ -300,7 +302,7 @@ function renderFolderPayload(payload, meta) {
     card.appendChild(ih);
 
     const media = h("div", "card-media");
-    const preview = crosshairPreview(item.content ?? "");
+    const preview = contentPreview(item.content ?? "");
     if (preview) media.appendChild(preview);
     const body = h("div", "share-item-body");
     body.textContent = item.content ?? "";
