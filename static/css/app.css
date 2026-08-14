@@ -861,7 +861,9 @@ button.crumb:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--s-4);
-  align-items: start;
+  /* stretch（默认值）保证同一行的卡片等高。内容区本身也定了高，
+     所以实际上整个网格的卡片都是一样高的，不会长短参差。 */
+  align-items: stretch;
 }
 
 .card {
@@ -960,8 +962,20 @@ button.crumb:hover {
   font-size: 14px;
 }
 
-.card-body {
+/* 内容行：左边可选的配置预览，右边内容文本 */
+.card-media {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s-3);
   margin: 0 var(--s-4);
+}
+
+.card-body {
+  /* 固定 4 行高：无论内容 1 行还是 40 行，卡片高度都一致 —— 这是让
+     整个网格对齐的关键，光靠 grid 的 stretch 只能对齐同一行。 */
+  --body-lines: 4;
+  flex: 1;
+  min-width: 0;
   padding: var(--s-3);
   border-radius: var(--r-sm);
   background: var(--surface-2);
@@ -976,7 +990,43 @@ button.crumb:hover {
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
-  min-height: 34px;
+  height: calc(var(--body-lines) * 1.65em + 2 * var(--s-3));
+}
+
+/* ── 无畏契约配置预览 ──
+   底色用中性暖灰而不是深色：职业选手里用纯黑配置的很多，靠黑色描边
+   成型的造型配置也不少，深色底上它们会整个糊掉。淡棋盘格提示这是
+   预览画布，同时让黑白两端都有对比。*/
+.xhair {
+  flex: 0 0 auto;
+  width: calc(var(--body-lines, 4) * 1.65em + 2 * var(--s-3));
+  font-size: 12px; /* 让上面的 em 与 .card-body 同基准 */
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background-color: #6f6b64;
+  background-image: linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.06) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(0, 0, 0, 0.06) 75%
+    ),
+    linear-gradient(
+      45deg,
+      rgba(0, 0, 0, 0.06) 25%,
+      transparent 25%,
+      transparent 75%,
+      rgba(0, 0, 0, 0.06) 75%
+    );
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+}
+
+.xhair svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .card-body.is-empty {
@@ -990,6 +1040,8 @@ button.crumb:hover {
   gap: var(--s-2);
   padding: var(--s-3) var(--s-4);
   min-height: 44px;
+  /* 顶到底部，标题换行时页脚仍与同行其他卡片齐平 */
+  margin-top: auto;
 }
 
 .meta {
@@ -1845,7 +1897,8 @@ button.crumb:hover {
 }
 
 .share-item-body {
-  margin: 0 var(--s-4) var(--s-4);
+  flex: 1;
+  min-width: 0;
   padding: var(--s-3);
   border-radius: var(--r-sm);
   background: var(--surface-2);
@@ -1857,6 +1910,24 @@ button.crumb:hover {
   word-break: break-word;
   max-height: 260px;
   overflow: auto;
+}
+
+/* 分享页的内容行沿用卡片那套，只是外边距不同 */
+.share-item .card-media {
+  margin: 0 var(--s-4) var(--s-4);
+  align-items: flex-start;
+}
+
+.share-item .xhair {
+  width: 96px;
+  height: 96px;
+}
+
+/* 单条目分享页：预览可以大一点，它是这一页的主角 */
+.xhair-lg {
+  width: 200px;
+  height: 200px;
+  margin: 0 auto var(--s-4);
 }
 
 .state-page {

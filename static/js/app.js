@@ -16,6 +16,7 @@ import {
   clearToken,
   setUnauthorizedHandler,
 } from "./api.js";
+import { crosshairPreview } from "./crosshair.js";
 
 /* ══════════════════════════════════════════════════
    常量
@@ -988,6 +989,11 @@ function itemCard(item, index, { showFolder = false } = {}) {
   head.appendChild(copyBtn);
   card.appendChild(head);
 
+  const media = h("div", "card-media");
+  // 内容是无畏契约配置片段时，左边补一张预览；不是就整行都给文本
+  const preview = crosshairPreview(item.content);
+  if (preview) media.appendChild(preview);
+
   const body = h("div", "card-body");
   if (item.content) body.textContent = item.content;
   else {
@@ -995,7 +1001,8 @@ function itemCard(item, index, { showFolder = false } = {}) {
     body.textContent = "（空内容）";
   }
   body.addEventListener("dblclick", () => openItemEditor(item));
-  card.appendChild(body);
+  media.appendChild(body);
+  card.appendChild(media);
 
   const foot = h("div", "card-foot");
   const meta = h("div", "meta");

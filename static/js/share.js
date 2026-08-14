@@ -5,6 +5,7 @@
  */
 
 import { api, ApiError } from "./api.js";
+import { crosshairPreview } from "./crosshair.js";
 
 const LS_THEME = "clipnest_theme";
 const COPIED_MS = 1500;
@@ -239,6 +240,12 @@ function renderItemPayload(payload, meta) {
   main.appendChild(head);
   main.appendChild(meta);
 
+  const preview = crosshairPreview(item.content ?? "");
+  if (preview) {
+    preview.classList.add("xhair-lg");
+    main.appendChild(preview);
+  }
+
   const pre = h("pre", "share-content");
   pre.textContent = item.content ?? "";
   main.appendChild(pre);
@@ -292,9 +299,13 @@ function renderFolderPayload(payload, meta) {
     ih.appendChild(copyButton(() => item.content ?? "", { label: "复制" }));
     card.appendChild(ih);
 
+    const media = h("div", "card-media");
+    const preview = crosshairPreview(item.content ?? "");
+    if (preview) media.appendChild(preview);
     const body = h("div", "share-item-body");
     body.textContent = item.content ?? "";
-    card.appendChild(body);
+    media.appendChild(body);
+    card.appendChild(media);
 
     main.appendChild(card);
   });
