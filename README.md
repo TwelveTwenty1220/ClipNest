@@ -41,13 +41,17 @@ pip install -r requirements.txt
 
 ## 公网访问
 
-通过 cloudflared 隧道暴露到自有域名：
+通过 cloudflared 命名隧道暴露到自有域名：
 
 ```bash
-cloudflared tunnel --url http://127.0.0.1:8420
+cloudflared tunnel create clipnest
+cloudflared tunnel route dns clipnest <your-domain>
+cloudflared tunnel run --url http://localhost:8420 clipnest
 ```
 
-HTTPS 是必需的——浏览器的 `navigator.clipboard` API 只在安全上下文可用。
+线上地址：<https://<your-domain>>
+
+HTTPS 是必需的——浏览器的 `navigator.clipboard` API 只在安全上下文（`isSecureContext === true`）可用。走 http 时前端会自动降级到 `textarea` + `execCommand`，但体验不如原生。
 
 ## 文档
 
