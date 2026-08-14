@@ -1350,8 +1350,12 @@ function renderView() {
   // 离开管理员面板时必须停掉倒计时，否则会一直空转并意外重绘
   stopInviteTimer();
   clear(root);
+  renderViewBody(root);
+  // 必须放在正文渲染之后：操作条要数当前渲染出来的卡片来算"全选本页"
   mountSelectionBar();
+}
 
+function renderViewBody(root) {
   if (state.query.trim()) {
     renderSearch(root);
     return;
