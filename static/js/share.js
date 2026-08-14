@@ -243,14 +243,14 @@ function renderItemPayload(payload, meta) {
   main.appendChild(head);
   main.appendChild(meta);
 
-  const preview = contentPreview(item.content ?? "", { large: true });
-  if (preview) {
-    main.appendChild(preview);
-  }
-
+  // 与应用内卡片一致的左右布局：预览在左，内容在右
+  const row = h("div", "share-solo");
+  const preview = contentPreview(item.content ?? "");
+  if (preview) row.appendChild(preview);
   const pre = h("pre", "share-content");
   pre.textContent = item.content ?? "";
-  main.appendChild(pre);
+  row.appendChild(pre);
+  main.appendChild(row);
 }
 
 function renderFolderPayload(payload, meta) {

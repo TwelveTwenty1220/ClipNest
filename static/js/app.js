@@ -326,6 +326,7 @@ const state = {
   view: { type: "all" },
   query: "", // 顶栏的全局搜索
   folderQuery: "", // 文件夹页内的就地搜索，换文件夹即清空
+  selection: new Set(), // 批量选中的条目 id
   expanded: loadExpanded(),
   offline: false,
   dragItemId: null,
@@ -771,6 +772,8 @@ function setView(view, { closeDrawer = true } = {}) {
   state.view = view;
   // 页内搜索是"这个文件夹里找"，换了文件夹就该清空，不然会一头雾水
   state.folderQuery = "";
+  // 选中的条目多半已经不在眼前了，留着只会造成误操作
+  state.selection.clear();
   saveView();
   if (view.type === "folder" && view.id) {
     // 自动展开到该文件夹，免得用户切过去看不到自己在哪
@@ -977,6 +980,192 @@ function appendFolderRows(container, folder, depth) {
   }
 }
 
+/* ── 查看全文 ──
+   卡片上的内容截到 4 行，长内容（比如一整篇笔记）在卡片里根本看不全。
+   这里给一个只读的全文视图，带复制和转去编辑。 */
+function openItemDetail(item) {
+  let ctx;
+  const path = item.folder_id ? folderLabel(item.folder_id) : "根目录";
+  ctx = openModal({
+    title: item.title || DEFAULT_TITLE,
+    size: "modal-lg",
+    build: ({ body }) => {
+      const meta = h("p", "detail-meta");
+      meta.textContent = `${path} · ${
+        item.updated_at && item.updated_at !== item.created_at
+          ? `更新于 ${absTime(item.updated_at)}`
+          : `创建于 ${absTime(item.created_at)}`
+      } · ${String(item.content ?? "").length} 字符`;
+      body.appendChild(meta);
+
+      const preview = contentPreview(item.content, {
+        folderPath: item.folder_id ? folderLabel(item.folder_id) : "",
+        large: true,
+      });
+      if (preview) body.appendChild(preview);
+
+      const pre = h("pre", "detail-content");
+      pre.textContent = item.content ?? "";
+      body.appendChild(pre);
+    },
+    footer: ({ foot }) => {
+      const edit = h("button", "btn", "编辑");
+      edit.type = "button";
+      edit.addEventListener("click", () => {
+        ctx.close();
+        openItemEditor(item);
+      });
+
+      const done = h("button", "btn", "关闭");
+      done.type = "button";
+      done.addEventListener("click", () => ctx.close());
+
+      const copy = h("button", "btn btn-primary");
+      copy.type = "button";
+      copy.appendChild(icon("copy", 14, 2));
+      copy.appendChild(h("span", null, "复制全部"));
+      copy.addEventListener("click", () => copyAndFlash(copy, item.content));
+
+      foot.append(edit, done, copy);
+    },
+  });
+}
+
+/* ── 批量选择 ── */
+
+function clearSelection({ rerender = true } = {}) {
+  if (!state.selection.size) return;
+  state.selection.clear();
+  if (rerender) renderView();
+}
+
+/** 当前视图里可见的条目，用于"全选"。 */
+function visibleItems() {
+  return Array.from(document.querySelectorAll("article.card"))
+    .map((el) => el.dataset.itemId)
+    .filter(Boolean);
+}
+
+function selectionBar() {
+  const count = state.selection.size;
+  if (!count) return null;
+
+  const bar = h("div", "sel-bar");
+  bar.setAttribute("role", "region");
+  bar.setAttribute("aria-label", "批量操作");
+  bar.appendChild(h("span", "sel-count", `已选 ${count} 项`));
+
+  const visible = visibleItems();
+  const allPicked = visible.length > 0 && visible.every((id) => state.selection.has(id));
+  const all = h("button", "btn btn-sm");
+  all.type = "button";
+  all.textContent = allPicked ? "取消全选" : `全选本页 ${visible.length} 项`;
+  all.addEventListener("click", () => {
+    if (allPicked) visible.forEach((id) => state.selection.delete(id));
+    else visible.forEach((id) => state.selection.add(id));
+    renderView();
+  });
+
+  const move = h("button", "btn btn-sm btn-primary");
+  move.type = "button";
+  move.appendChild(icon("folder", 14, 2));
+  move.appendChild(h("span", null, "移动到…"));
+  move.addEventListener("click", () => openBulkMove());
+
+  const cancel = iconButton("x", "取消选择", { size: 15 });
+  cancel.addEventListener("click", () => clearSelection());
+
+  bar.append(all, move, cancel);
+  return bar;
+}
+
+function openBulkMove() {
+  const ids = Array.from(state.selection);
+  if (!ids.length) return;
+  let select;
+  let errorBox;
+  let ctx;
+
+  ctx = openModal({
+    title: `把 ${ids.length} 项移动到`,
+    build: ({ body }) => {
+      const field = h("div", "field");
+      const lab = h("label", "field-label", "目标文件夹");
+      lab.htmlFor = "bulk-folder";
+      select = h("select", "select");
+      select.id = "bulk-folder";
+      buildFolderOptions(select);
+      select.value = currentFolderId() ?? "";
+      field.append(lab, select);
+      body.appendChild(field);
+
+      errorBox = h("p", "form-error");
+      errorBox.hidden = true;
+      errorBox.setAttribute("role", "alert");
+      body.appendChild(errorBox);
+    },
+    initialFocus: () => select,
+    footer: ({ foot }) => {
+      const cancel = h("button", "btn", "取消");
+      cancel.type = "button";
+      cancel.addEventListener("click", () => ctx.close());
+
+      const ok = h("button", "btn btn-primary", "移动");
+      ok.type = "button";
+      ok.addEventListener("click", async () => {
+        const target = select.value || null;
+        ok.disabled = true;
+        ok.textContent = "移动中…";
+        const failed = await bulkMove(ids, target);
+        if (failed.length) {
+          ok.disabled = false;
+          ok.textContent = "移动";
+          errorBox.hidden = false;
+          errorBox.textContent = `有 ${failed.length} 项没能移动，请重试`;
+          return;
+        }
+        ctx.close();
+      });
+      foot.append(cancel, ok);
+    },
+  });
+}
+
+/** 接口只支持单条改动，这里分批并发，避免一次几百个请求打满连接。 */
+async function bulkMove(ids, folderId) {
+  const targets = ids.filter((id) => {
+    const it = state.items.find((x) => x.id === id);
+    return it && (it.folder_id ?? null) !== (folderId ?? null);
+  });
+  const failed = [];
+  const CHUNK = 6;
+  for (let i = 0; i < targets.length; i += CHUNK) {
+    const batch = targets.slice(i, i + CHUNK);
+    const results = await Promise.allSettled(
+      batch.map((id) => api.updateItem(id, { folder_id: folderId ?? null }))
+    );
+    results.forEach((r, k) => {
+      if (r.status === "fulfilled") {
+        bumpRev(r.value);
+        upsertItem(r.value?.item);
+      } else {
+        failed.push(batch[k]);
+      }
+    });
+  }
+  const moved = targets.length - failed.length;
+  if (moved) {
+    state.selection.clear();
+    // 移动会影响多个文件夹的计数，直接全量重取最稳
+    await refresh();
+    toast(`已移动 ${moved} 项到「${folderId ? folderLabel(folderId) : "根目录"}」`, "success");
+  } else if (!failed.length) {
+    clearSelection();
+    toast("选中的条目已经在该文件夹里", "info");
+  }
+  return failed;
+}
+
 function openFolderMenu(anchor, folder) {
   openFloatingMenu(anchor, [
     { label: "重命名", icon: "pencil", onClick: () => renameFolder(folder) },
@@ -997,6 +1186,7 @@ function openFolderMenu(anchor, folder) {
 
 function itemCard(item, index, { showFolder = false } = {}) {
   const card = h("article", `card${item.pinned ? " is-pinned" : ""}`);
+  card.dataset.itemId = item.id; // 供"全选本页"识别当前渲染出来的条目
   card.style.animationDelay = `${Math.min(index, 12) * 18}ms`;
   card.draggable = true;
   card.addEventListener("dragstart", (ev) => {
@@ -1016,6 +1206,22 @@ function itemCard(item, index, { showFolder = false } = {}) {
   });
 
   const head = h("div", "card-head");
+
+  const pick = h("label", "card-pick");
+  const box = h("input");
+  box.type = "checkbox";
+  box.checked = state.selection.has(item.id);
+  box.setAttribute("aria-label", `选择「${item.title || DEFAULT_TITLE}」`);
+  box.addEventListener("change", () => {
+    if (box.checked) state.selection.add(item.id);
+    else state.selection.delete(item.id);
+    card.classList.toggle("is-picked", box.checked);
+    renderView();
+  });
+  pick.appendChild(box);
+  head.appendChild(pick);
+  if (box.checked) card.classList.add("is-picked");
+
   const title = h("h3", "card-title");
   if (item.pinned) {
     const mark = h("span", "pin-mark");
@@ -1048,7 +1254,17 @@ function itemCard(item, index, { showFolder = false } = {}) {
     body.classList.add("is-empty");
     body.textContent = "（空内容）";
   }
-  body.addEventListener("dblclick", () => openItemEditor(item));
+  // 卡片里的内容被截到 4 行，点一下看全文
+  body.tabIndex = 0;
+  body.setAttribute("role", "button");
+  body.setAttribute("aria-label", `查看「${item.title || DEFAULT_TITLE}」全文`);
+  body.addEventListener("click", () => openItemDetail(item));
+  body.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      openItemDetail(item);
+    }
+  });
   media.appendChild(body);
   card.appendChild(media);
 
@@ -1120,12 +1336,21 @@ function render() {
   renderView();
 }
 
+function mountSelectionBar() {
+  document.getElementById("sel-bar")?.remove();
+  const bar = selectionBar();
+  if (!bar) return;
+  bar.id = "sel-bar";
+  document.body.appendChild(bar);
+}
+
 function renderView() {
   const root = $("#view");
   if (!root) return;
   // 离开管理员面板时必须停掉倒计时，否则会一直空转并意外重绘
   stopInviteTimer();
   clear(root);
+  mountSelectionBar();
 
   if (state.query.trim()) {
     renderSearch(root);
