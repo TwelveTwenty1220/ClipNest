@@ -7,7 +7,7 @@
 import { api, ApiError } from "./api.js";
 
 /* 与主应用同一个可选预览插件；没装就只是没有预览。 */
-const previewPlugin = await import("./preview.js").catch(() => null);
+const previewPlugin = await import("./preview.js?v=1").catch(() => null);
 const contentPreview = previewPlugin?.contentPreview ?? (() => null);
 
 const LS_THEME = "clipnest_theme";

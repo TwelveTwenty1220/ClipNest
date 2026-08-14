@@ -21,6 +21,12 @@ def create_app(*, verbose_bootstrap: bool = True) -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
     app.config["JSON_AS_ASCII"] = False
     app.json.ensure_ascii = False
+    # 静态资源每次都回源校验（带 ETag，未改动仍是 304，几乎不费流量）。
+    # Flask 默认给 12 小时强缓存，页面结构一变就会出现"刷新了还是旧的"，
+    # 更糟的是浏览器连 404 也一起缓存：某个新文件在上线前的空窗期被请求过一次，
+    # 之后好几个小时都不会再去取它。这种问题排查起来极浪费时间，不值得为
+    # 这点带宽省下的开销买单。
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
     bootstrap(verbose=verbose_bootstrap)
     register_error_handlers(app)

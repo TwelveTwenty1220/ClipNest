@@ -20,7 +20,9 @@ import {
 /* 可选的内容预览插件。装了就用，没装就只是没有预览 —— 它不随仓库分发，
  * 所以这里必须容错，不能让整个应用因为少一个文件就挂掉。
  * 插件自己决定什么内容值得预览、以及往哪个目录下才生效。 */
-const previewPlugin = await import("./preview.js").catch(() => null);
+// 带版本号是为了绕开可能被缓存的 404：插件文件上线前的空窗期若被请求过一次，
+// 浏览器会把那次 404 连同当时的强缓存头一起存下来，之后几小时都不再回源。
+const previewPlugin = await import("./preview.js?v=1").catch(() => null);
 const contentPreview = previewPlugin?.contentPreview ?? (() => null);
 
 /* ══════════════════════════════════════════════════
