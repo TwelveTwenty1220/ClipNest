@@ -57,6 +57,7 @@ tunnel-*.json
 /tests/test_crosshair.py
 /tests/data/crosshair_corpus.json
 /scripts/seed_valorant_crosshairs.py
+/scripts/make_originals.py
 /scripts/data/
 
 # ── 工具产物 ─────────────────────────────────────────
