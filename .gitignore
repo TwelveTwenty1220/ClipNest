@@ -1,0 +1,63 @@
+# ── 敏感数据：绝对不能进仓库 ─────────────────────────────
+# 文件数据库（用户表、密码哈希、条目内容、分享快照）
+data/
+# 运行期生成的密钥与初始管理员密码
+*.secret
+*.key
+ADMIN_PASSWORD.txt
+.env
+.env.*
+!.env.example
+instance/
+
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+pip-wheel-metadata/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ── 运行期产物 ───────────────────────────────────────
+*.log
+logs/
+*.pid
+gunicorn.pid
+cloudflared.log
+tunnel-*.json
+
+# ── 编辑器 / 系统 ────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── 临时 ────────────────────────────────────────────
+tmp/
+.tmp/
+*.bak
+*.orig
