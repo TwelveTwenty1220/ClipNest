@@ -34,24 +34,12 @@ pip install -r requirements.txt
 首次启动会自动：
 
 - 生成 `data/config.json`（内含 JWT 与邀请码密钥）
-- 创建管理员账号 `1220`，随机密码打印到控制台并写入 `data/ADMIN_PASSWORD.txt`
+- 创建管理员账号 `admin`，随机密码打印到控制台并写入 `data/ADMIN_PASSWORD.txt`
 
-> ⚠️ 把管理员密码保存到密码管理器后，删掉 `data/ADMIN_PASSWORD.txt`。
-> `data/` 整个目录已在 `.gitignore` 中，不会进仓库。
 
 ## 公网访问
 
-通过 cloudflared 命名隧道暴露到自有域名：
-
-```bash
-cloudflared tunnel create clipnest
-cloudflared tunnel route dns clipnest <your-domain>
-cloudflared tunnel run --url http://localhost:8420 clipnest
-```
-
-线上地址：<https://<your-domain>>
-
-HTTPS 是必需的——浏览器的 `navigator.clipboard` API 只在安全上下文（`isSecureContext === true`）可用。走 http 时前端会自动降级到 `textarea` + `execCommand`，但体验不如原生。
+xxxxxx
 
 ## 文档
 
@@ -64,6 +52,3 @@ HTTPS 是必需的——浏览器的 `navigator.clipboard` API 只在安全上�
 pytest
 ```
 
-## 安全说明
-
-仓库内不包含任何真实密钥、密码或 token。所有敏感值在运行时生成并写入 `data/`（已忽略），文档中一律以 `***` 占位。
