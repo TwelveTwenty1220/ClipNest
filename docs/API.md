@@ -261,7 +261,7 @@ DEFAULT_TITLE = "未命名"
 ### `POST /api/store/items`
 
 ```json
-{ "title": "部署命令", "content": "PORT=8420;...", "folder_id": null }
+{ "title": "部署命令", "content": "PORT=<PORT>;...", "folder_id": null }
 ```
 
 `title` 可省略或为空串 → 使用 `DEFAULT_TITLE`（`"未命名"`）。`content` 必填，可以是空串。
@@ -433,7 +433,7 @@ DEFAULT_TITLE = "未命名"
 |---|---|
 | `GET /` | 主应用单页（`templates/index.html`）。未登录时前端自行渲染登录/注册界面 |
 | `GET /s/<token>` | 公开分享只读页（`templates/share.html`），免认证，页面内用 `GET /api/public/<token>` 取数据 |
-| `GET /healthz` | `{"ok": true}`，供隧道健康检查 |
+| `GET /healthz` | `{"ok": true}`，供健康检查 |
 
 ---
 

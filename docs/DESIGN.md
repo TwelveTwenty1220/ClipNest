@@ -22,7 +22,6 @@ ClipNest 提供一个公网可访问的 Web 页面：登录后写入内容，另
 | 部署 | gunicorn `-w 1 --threads 8` | 单进程避免文件库跨进程写竞争；线程满足并发 |
 | 前端 | 原生 HTML/CSS/JS | 无构建步骤，部署即静态文件 |
 | 存储 | JSON 文件 + fcntl 锁 + 原子替换 | 数据量小（单用户 ≤2000 条），无需数据库 |
-| 隧道 | cloudflared → `<your-domain>` 子域名 | 已有域名，HTTPS 使剪贴板 API 可用 |
 | 环境 | conda env `clipsync` (Python 3.12) | 与 base 隔离 |
 
 ## 3. 架构
@@ -30,8 +29,8 @@ ClipNest 提供一个公网可访问的 Web 页面：登录后写入内容，另
 ```
                     ┌──────────────┐
    设备 A 浏览器 ───▶ │              │
-                    │  cloudflared │ ──▶ gunicorn 127.0.0.1:8420
-   设备 B 浏览器 ───▶ │   (HTTPS)    │         │
+                    │  HTTPS 入口  │ ──▶ gunicorn 127.0.0.1:<PORT>
+   设备 B 浏览器 ───▶ │  （反向代理）│         │
                     └──────────────┘         │
                                              ▼
                                     ┌─────────────────┐

@@ -37,10 +37,6 @@ pip install -r requirements.txt
 - 创建管理员账号 `admin`，随机密码打印到控制台并写入 `data/ADMIN_PASSWORD.txt`
 
 
-## 公网访问
-
-xxxxxx
-
 ## 文档
 
 - [设计文档](docs/DESIGN.md) — 架构、模块划分、关键机制
